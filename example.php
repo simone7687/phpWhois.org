@@ -1,143 +1,131 @@
-<?php
-/*
-Whois.php        PHP classes to conduct whois queries
+<!DOCTYPE html>
+<html lang="it">
 
-Copyright (C)1999,2005 easyDNS Technologies Inc. & Mark Jeftovic
+<head>
+<style>
+    table {
+        width:100%;
+    }
+    table, th, td {
+        border: 1px solid black;
+        border-collapse: collapse;
+    }
+    th, td {
+        padding: 15px;
+        text-align: center;
+    }
+    #domainTable tr:nth-child(even) {
+        background-color: #fff;
+    }
+    #domainTable tr:nth-child(odd) {
+        background-color: #eee;
+        font-size: 170%;
+    }
+    #domainTable th {
+        background-color: black;
+        color: white;
+    }
+</style>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
 
-Maintained by David Saez
-
-For the most recent version of this package visit:
-
-http://www.phpwhois.org
-
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- */
-
-header('Content-Type: text/html; charset=UTF-8');
-
-$out =  implode('', file('example.html'));
-
-$out = str_replace('{self}', $_SERVER['PHP_SELF'], $out);
-
-$resout = extract_block($out, 'results');
-
-if (isSet($_GET['query']))
-	{
-	$query = $_GET['query'];
-
-	if (!empty($_GET['output']))
-		$output = $_GET['output'];
-	else
-		$output = '';
-
-	include_once('src/whois.main.php');
+<body>
+    <h2>Whois</h2>
+    <form action="" method="post">
+        Inserire il Domino qui: <input type="text" name="text_domain" placeholder="Es. digiform.it" value="<?php echo isset($_POST['text_domain']) ? $_POST['text_domain']: '' ?>" />
+        <input type="submit" name="submit" value="Cerca" /><br><br>
+        <label id="reslbl" style="align-content: center"></label>
+    </form>
+    <table id="domainTable">
+    <tbody></tbody>
+    </table>
+    <?php
+    // https://github.com/sparc/phpWhois.org
+    include_once('src/whois.main.php');
 	include_once('src/whois.utils.php');
 
 	$whois = new Whois();
+    // fast whois
+    // whois->deep_whois = false;
+    
+        if ( isset($_POST['submit']) && !empty($_POST['text_domain']) )
+        {
+            $text_domain = $_POST['text_domain'];
+            // check domain
+            if (strpos($text_domain,".") < 1) {
+                $text_domain = strtolower($text_domain);
+                echo "<script>
+                document.getElementById('reslbl').style.color = 'red';
+                document.getElementById('reslbl').innerHTML = 'Nome del dominio non valido.';
+                </script>";
+                return;
+            }
+            $slit_domain = explode(".", $text_domain);
+            $text_domain = $slit_domain[0];
+            echo "<script>
+            var table = document.getElementById('domainTable').getElementsByTagName('tbody')[0];
+            </script>";
+            // dell all row
+            echo "<script>
+            var totalRowCount = table.rows.length;
+            for (i = 0; i < totalRowCount; i++) {
+                document.getElementById('domainTable').deleteRow(0);
+            }
+            </script>";
 
-	// Set to true if you want to allow proxy requests
-	$allowproxy = false;
+            $arr = array(
+            		"it" => "whois.nic.it",
+                   "com" => "whois.internic.net",
+                   "eu"  => "whois.registry.eu",
+                   "net"  => "whois.internic.net",
+                   "org"  => "whois.publicinterestregistry.net",
+                   "info" => "whois.afilias.net",
+                   "biz"  => "whois.neulevel.biz"
+                   );
+            // I use the function whois from functions_whois.php
+            echo "<script>
+            const arr = ['.it', '.com', '.eu', '.net', '.org', '.info', '.biz'];
+            var row = table.insertRow(-1);
+            var i = 0;
+            </script>";
+			// add the header row.
+            foreach ($arr as $key => $value) {
+                echo "<script>
+                var cell = row.insertCell(-1);
+                cell.innerHTML = arr[i];
+                i++;
+                </script>";
+            }
 
- 	// get faster but less acurate results
- 	$whois->deep_whois = empty($_GET['fast']);
- 	
- 	// To use special whois servers (see README)
-	//$whois->UseServer('uk','whois.nic.uk:1043?{hname} {ip} {query}');
-	//$whois->UseServer('au','whois-check.ausregistry.net.au');
-
-	// Comment the following line to disable support for non ICANN tld's
-	$whois->non_icann = true;
-
-	$result = $whois->Lookup($query);
-	$resout = str_replace('{query}', $query, $resout);
-	$winfo = '';
-
-	switch ($output)
-		{
-		case 'object':
-			if ($whois->Query['status'] < 0)
+			// add data row
+            echo "<script>
+                var row = table.insertRow(-1);
+            </script>";
+            foreach ($arr as $key => $value) {
+                echo "<script>
+                var cell = row.insertCell(-1);
+                </script>";
+                // Domain Available?
+                // $whois->UseServer($key, $value);
+                $result = $whois->Lookup($text_domain . "." . $key);
+                if (!empty($result['regrinfo']) && !empty($result['regrinfo']['registered']))
 				{
-				$winfo = implode($whois->Query['errstr'],"\n<br></br>");
+					$regrinfo = $result['regrinfo']['registered'];
 				}
-			else
-				{
-				$utils = new utils;
-				$winfo = $utils->showObject($result);
-				}
-			break;
-
-		case 'nice':
-			if (!empty($result['rawdata']))
-				{
-				$utils = new utils;
-				$winfo = $utils->showHTML($result);
-				}
-			else
-				{
-				if (isset($whois->Query['errstr']))
-					$winfo = implode($whois->Query['errstr'],"\n<br></br>");
-				else
-					$winfo = 'Unexpected error';
-				}
-			break;
-
-		case 'proxy':
-			if ($allowproxy)
-				exit(serialize($result));
-
-		default:
-			if(!empty($result['rawdata']))
-				{
-				$winfo .= '<pre>'.implode($result['rawdata'],"\n").'</pre>';
-				}
-			else
-				{
-				$winfo = implode($whois->Query['errstr'],"\n<br></br>");
-				}
-		}
-
-	$resout = str_replace('{result}', $winfo, $resout);
-	}
-else
-	$resout = '';
-
-$out = str_replace('{ver}',$whois->CODE_VERSION,$out);
-exit(str_replace('{results}', $resout, $out));
-
-//-------------------------------------------------------------------------
-
-function extract_block (&$plantilla,$mark,$retmark='')
-{
-$start = strpos($plantilla,'<!--'.$mark.'-->');
-$final = strpos($plantilla,'<!--/'.$mark.'-->');
-
-if ($start === false || $final === false) return;
-
-$ini = $start+7+strlen($mark);
-
-$ret=substr($plantilla,$ini,$final-$ini);
-
-$final+=8+strlen($mark);
-
-if ($retmark===false)
-	$plantilla=substr($plantilla,0,$start).substr($plantilla,$final);
-else	
-	{
-	if ($retmark=='') $retmark=$mark;
-	$plantilla=substr($plantilla,0,$start).'{'.$retmark.'}'.substr($plantilla,$final);
-	}
-	
-return $ret;
-}
+                if ($regrinfo == 'no' && !checkdnsrr($text_domain . "." . $key, 'ANY')) {
+                    echo "<script>
+                    cell.innerHTML = 'LIBERO';
+                    cell.style.color = 'green';
+                    </script>";
+                }
+                else {
+                    echo "<script>
+                    cell.innerHTML = 'OCCUPATO';
+                    cell.style.color = 'red';
+                    </script>";
+                }
+            }
+        }
+    ?>
+</body>
+</html>
